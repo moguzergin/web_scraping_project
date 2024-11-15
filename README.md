@@ -51,3 +51,5 @@ Bu proje, fabrika kaynaklı ve motorlu taşıt kaynaklı hava kirliliği ile ilg
 `kontrast_ayari.py` scriptini çalıştırarak görsellerin kontrastını ayarlayın.
 5. **Döndürme İşlemini Yapın:**
 `dondurme.py` scriptini çalıştırarak görselleri döndürün.
+![proje2](https://github.com/user-attachments/assets/355852fa-b50b-486e-bf8e-cf18ac227c4d)
+![proje](https://github.com/user-attachments/assets/8f906698-d64a-48d4-af6b-09b38d757e75)
