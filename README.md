@@ -137,26 +137,6 @@ VİT Epoch Loss Grafiği:
 
 ---
 
-## Nasıl Kullanılır?
-1. **Gerekli Kütüphaneleri Kurun:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. **Görselleri Toplayın:**
-   ```bash
-   python goruntu_toplama.py
-   ```
-3. **Veri İşleme Scriptlerini Çalıştırın:**
-   - Parlaklık: `python parlaklik_ayari.py`
-   - Kontrast: `python kontrast_ayari.py`
-   - Döndürme: `python dondurme.py`
-4. **Modelleri Eğitin:**
-   ```bash
-   Colab Linkinden Projeye Ulaşabilirsiniz.
-   ```
-5. **Sonuçları ve Performansı Değerlendirin.**
-
----
 
 ## Sonuç
 EfficientNet modeli, performans ve hesaplama etkinliği bakımından en iyi sonucu vermiştir. Proje, hava kirliliği izleme sistemleri için etkili bir yaklaşım sunmaktadır.
