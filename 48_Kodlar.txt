@@ -1,0 +1,753 @@
+Kodlar:
+
+1.kısım:
+from google.colab import drive
+drive.mount('/content/drive')
+
+!pip install transformers tensorflow torch torchvision matplotlib scikit-learn
+
+import os
+
+fabrika_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Fabrika/Fabrika_Veriler'
+tasit_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Tasit/Tasit_Veriler'
+
+print("Fabrika Verileri:")
+for root, dirs, files in os.walk(fabrika_path):
+    print(f"Klasör: {root}, Görsel Sayısı: {len(files)}")
+
+print("\nMotorlu Taşıtlar Verileri:")
+for root, dirs, files in os.walk(tasit_path):
+    print(f"Klasör: {root}, Görsel Sayısı: {len(files)}")
+
+
+
+
+
+
+
+2.kısım:
+import tensorflow as tf
+import os
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print("GPU bellek büyümesi etkinleştirildi")
+    except RuntimeError as e:
+        print(e)
+
+fabrika_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Fabrika/Fabrika_Veriler'
+tasit_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Tasit/Tasit_Veriler'
+
+IMG_SIZE = (224, 224)
+
+def preprocess_dataset(image_folder, label):
+    dataset = tf.data.Dataset.list_files(f"{image_folder}/*", shuffle=True) 
+
+    def process_path(file_path):
+        img = tf.io.read_file(file_path) 
+        img = tf.image.decode_jpeg(img, channels=3) 
+        img = tf.image.resize(img, IMG_SIZE) 
+        img = img / 255.0 
+        return img, label 
+
+    return dataset.map(process_path, num_parallel_calls=tf.data.AUTOTUNE)
+
+fabrika_dataset = preprocess_dataset(fabrika_path, 0) 
+tasit_dataset = preprocess_dataset(tasit_path, 1) 
+
+total_dataset = fabrika_dataset.concatenate(tasit_dataset)
+total_dataset = total_dataset.shuffle(10000) 
+
+train_size = int(0.8 * len(list(total_dataset))) 
+train_dataset = total_dataset.take(train_size)
+test_dataset = total_dataset.skip(train_size)
+
+train_dataset = train_dataset.batch(32).prefetch(tf.data.AUTOTUNE)
+test_dataset = test_dataset.batch(32).prefetch(tf.data.AUTOTUNE)
+
+
+
+
+
+
+
+3.kısım: 
+from tensorflow.keras import layers, models
+from tensorflow.keras.applications import EfficientNetB0
+
+base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+base_model.trainable = False 
+
+model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(2, activation='softmax')  
+])
+
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+history = model.fit(train_dataset, validation_data=test_dataset, epochs=10)
+
+import matplotlib.pyplot as plt
+plt.plot(history.history['accuracy'], label='Eğitim Doğruluğu')
+plt.plot(history.history['val_accuracy'], label='Doğrulama Doğruluğu')
+plt.legend()
+plt.show()
+
+
+print(f"Eğitim seti: {len(list(train_dataset))} batch")
+print(f"Test seti: {len(list(test_dataset))} batch")
+
+
+
+
+
+
+
+4.kısım:
+import os
+import shutil
+
+base_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi'
+fabrika_src = os.path.join(base_path, 'Fabrika/Fabrika_Veriler')
+tasit_src = os.path.join(base_path, 'Tasit/Tasit_Veriler')
+
+target_path = os.path.join(base_path, 'Veriler')
+fabrika_target = os.path.join(target_path, 'Fabrika')
+tasit_target = os.path.join(target_path, 'Tasit')
+
+os.makedirs(fabrika_target, exist_ok=True)
+os.makedirs(tasit_target, exist_ok=True)
+
+for file_name in os.listdir(fabrika_src):
+    src_file = os.path.join(fabrika_src, file_name)
+    dst_file = os.path.join(fabrika_target, file_name)
+    shutil.move(src_file, dst_file)
+
+for file_name in os.listdir(tasit_src):
+    src_file = os.path.join(tasit_src, file_name)
+    dst_file = os.path.join(tasit_target, file_name)
+    shutil.move(src_file, dst_file)
+
+print("Klasörler başarıyla düzenlendi.")
+
+
+
+
+
+
+
+5.kısım:
+from sklearn.metrics import roc_auc_score, roc_curve
+import time
+import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+from transformers import ViTForImageClassification, ViTFeatureExtractor
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
+feature_extractor = ViTFeatureExtractor.from_pretrained("google/vit-base-patch16-224-in21k")
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
+])
+
+data_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Veriler'
+dataset = datasets.ImageFolder(root=data_path, transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224-in21k", num_labels=2)
+model = model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+train_losses, val_losses = [], []
+start_time = time.time()
+for epoch in range(3):
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(inputs).logits
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    train_losses.append(total_loss / len(train_loader))
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs, labels = batch
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs).logits
+            loss = loss_fn(outputs, labels)
+            val_loss += loss.item()
+    val_losses.append(val_loss / len(test_loader))
+    print(f"Epoch {epoch+1}, Train Loss: {train_losses[-1]}, Validation Loss: {val_losses[-1]}")
+end_time = time.time()
+training_time = end_time - start_time
+
+inference_start = time.time()
+y_true, y_pred = [], []
+with torch.no_grad():
+    for batch in test_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        outputs = model(inputs).logits
+        predictions = torch.argmax(outputs, dim=-1)
+        y_true.extend(labels.cpu().numpy())
+        y_pred.extend(predictions.cpu().numpy())
+inference_end = time.time()
+inference_time = inference_end - inference_start
+
+from sklearn.metrics import classification_report, confusion_matrix
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=dataset.classes))
+
+conf_matrix = confusion_matrix(y_true, y_pred)
+TP = conf_matrix[1, 1]
+TN = conf_matrix[0, 0]
+FP = conf_matrix[0, 1]
+FN = conf_matrix[1, 0]
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+print(f"Sensitivity: {sensitivity:.2f}")
+print(f"Specificity: {specificity:.2f}")
+
+fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+auc_score = roc_auc_score(y_true, y_pred)
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {auc_score:.2f})")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Eğrisi")
+plt.legend()
+plt.show()
+
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=dataset.classes, yticklabels=dataset.classes)
+plt.xlabel("Tahmin Edilen")
+plt.ylabel("Gerçek")
+plt.title("Karmaşıklık Matrisi")
+plt.show()
+
+plt.plot(train_losses, label="Eğitim Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Epoch vs Loss")
+plt.legend()
+plt.show()
+
+print(f"Eğitim Süresi: {training_time:.2f} saniye")
+print(f"Çıkarım Süresi: {inference_time:.2f} saniye")
+
+
+
+
+
+
+6.kısım:
+from transformers import DeiTForImageClassification, DeiTFeatureExtractor
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import torch
+import time
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+feature_extractor = DeiTFeatureExtractor.from_pretrained("facebook/deit-base-distilled-patch16-224")
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
+])
+
+data_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Veriler'
+dataset = datasets.ImageFolder(root=data_path, transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = DeiTForImageClassification.from_pretrained("facebook/deit-base-distilled-patch16-224", num_labels=2)
+model = model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+train_losses, val_losses = [], []
+start_time = time.time()
+for epoch in range(3):
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(inputs).logits
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    train_losses.append(total_loss / len(train_loader))
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs, labels = batch
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs).logits
+            loss = loss_fn(outputs, labels)
+            val_loss += loss.item()
+    val_losses.append(val_loss / len(test_loader))
+    print(f"Epoch {epoch+1}, Train Loss: {train_losses[-1]}, Validation Loss: {val_losses[-1]}")
+end_time = time.time()
+training_time = end_time - start_time
+
+inference_start = time.time()
+y_true, y_pred = [], []
+with torch.no_grad():
+    for batch in test_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        outputs = model(inputs).logits
+        predictions = torch.argmax(outputs, dim=-1)
+        y_true.extend(labels.cpu().numpy())
+        y_pred.extend(predictions.cpu().numpy())
+inference_end = time.time()
+inference_time = inference_end - inference_start
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=dataset.classes))
+
+conf_matrix = confusion_matrix(y_true, y_pred)
+TP = conf_matrix[1, 1]
+TN = conf_matrix[0, 0]
+FP = conf_matrix[0, 1]
+FN = conf_matrix[1, 0]
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+print(f"Sensitivity: {sensitivity:.2f}")
+print(f"Specificity: {specificity:.2f}")
+
+fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+auc_score = roc_auc_score(y_true, y_pred)
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {auc_score:.2f})")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Eğrisi")
+plt.legend()
+plt.show()
+
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=dataset.classes, yticklabels=dataset.classes)
+plt.xlabel("Tahmin Edilen")
+plt.ylabel("Gerçek")
+plt.title("Karmaşıklık Matrisi")
+plt.show()
+
+plt.plot(train_losses, label="Eğitim Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Epoch vs Loss")
+plt.legend()
+plt.show()
+
+print(f"Eğitim Süresi: {training_time:.2f} saniye")
+print(f"Çıkarım Süresi: {inference_time:.2f} saniye")
+
+
+
+
+
+
+7.kısım:
+from transformers import BeitForImageClassification, BeitFeatureExtractor
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import torch
+import time
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+feature_extractor = BeitFeatureExtractor.from_pretrained("microsoft/beit-base-patch16-224-pt22k-ft22k")
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
+])
+
+data_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Veriler'
+dataset = datasets.ImageFolder(root=data_path, transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = BeitForImageClassification.from_pretrained(
+    "microsoft/beit-base-patch16-224-pt22k-ft22k",
+    num_labels=2,  
+    ignore_mismatched_sizes=True  
+)
+model = model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+train_losses, val_losses = [], []
+start_time = time.time()
+for epoch in range(3): 
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(inputs).logits
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    train_losses.append(total_loss / len(train_loader))
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs, labels = batch
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs).logits
+            loss = loss_fn(outputs, labels)
+            val_loss += loss.item()
+    val_losses.append(val_loss / len(test_loader))
+    print(f"Epoch {epoch+1}, Train Loss: {train_losses[-1]}, Validation Loss: {val_losses[-1]}")
+end_time = time.time()
+training_time = end_time - start_time
+
+inference_start = time.time()
+y_true, y_pred = [], []
+with torch.no_grad():
+    for batch in test_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        outputs = model(inputs).logits
+        predictions = torch.argmax(outputs, dim=-1)
+        y_true.extend(labels.cpu().numpy())
+        y_pred.extend(predictions.cpu().numpy())
+inference_end = time.time()
+inference_time = inference_end - inference_start
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=dataset.classes))
+
+conf_matrix = confusion_matrix(y_true, y_pred)
+TP = conf_matrix[1, 1]
+TN = conf_matrix[0, 0]
+FP = conf_matrix[0, 1]
+FN = conf_matrix[1, 0]
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+print(f"Sensitivity: {sensitivity:.2f}")
+print(f"Specificity: {specificity:.2f}")
+
+fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+auc_score = roc_auc_score(y_true, y_pred)
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {auc_score:.2f})")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Eğrisi")
+plt.legend()
+plt.show()
+
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=dataset.classes, yticklabels=dataset.classes)
+plt.xlabel("Tahmin Edilen")
+plt.ylabel("Gerçek")
+plt.title("Karmaşıklık Matrisi")
+plt.show()
+
+plt.plot(train_losses, label="Eğitim Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Epoch vs Loss")
+plt.legend()
+plt.show()
+
+print(f"Eğitim Süresi: {training_time:.2f} saniye")
+print(f"Çıkarım Süresi: {inference_time:.2f} saniye")
+
+
+
+
+
+8.kısım:
+from torchvision import models, datasets, transforms
+from torch.utils.data import DataLoader
+import torch
+import time
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+data_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Veriler'
+dataset = datasets.ImageFolder(root=data_path, transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = models.efficientnet_b0(pretrained=True)  
+model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, 2)  
+model = model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+train_losses, val_losses = [], []
+start_time = time.time()
+for epoch in range(3): 
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    train_losses.append(total_loss / len(train_loader))
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs, labels = batch
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = loss_fn(outputs, labels)
+            val_loss += loss.item()
+    val_losses.append(val_loss / len(test_loader))
+    print(f"Epoch {epoch+1}, Train Loss: {train_losses[-1]}, Validation Loss: {val_losses[-1]}")
+end_time = time.time()
+training_time = end_time - start_time
+
+inference_start = time.time()
+y_true, y_pred = [], []
+with torch.no_grad():
+    for batch in test_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        outputs = model(inputs)
+        predictions = torch.argmax(outputs, dim=-1)
+        y_true.extend(labels.cpu().numpy())
+        y_pred.extend(predictions.cpu().numpy())
+inference_end = time.time()
+inference_time = inference_end - inference_start
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=dataset.classes))
+
+conf_matrix = confusion_matrix(y_true, y_pred)
+TP = conf_matrix[1, 1]
+TN = conf_matrix[0, 0]
+FP = conf_matrix[0, 1]
+FN = conf_matrix[1, 0]
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+print(f"Sensitivity: {sensitivity:.2f}")
+print(f"Specificity: {specificity:.2f}")
+
+fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+auc_score = roc_auc_score(y_true, y_pred)
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {auc_score:.2f})")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Eğrisi")
+plt.legend()
+plt.show()
+
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=dataset.classes, yticklabels=dataset.classes)
+plt.xlabel("Tahmin Edilen")
+plt.ylabel("Gerçek")
+plt.title("Karmaşıklık Matrisi")
+plt.show()
+
+plt.plot(train_losses, label="Eğitim Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Epoch vs Loss")
+plt.legend()
+plt.show()
+
+print(f"Eğitim Süresi: {training_time:.2f} saniye")
+print(f"Çıkarım Süresi: {inference_time:.2f} saniye")
+
+
+
+
+
+
+9.kısım:
+from transformers import AutoFeatureExtractor, SwinForImageClassification
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+import torch
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+import time
+
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+data_path = '/content/drive/MyDrive/Yazılım_Gelistirme_Labaratuvarı_Proje/Hava_Kirliligi/Veriler'
+dataset = datasets.ImageFolder(root=data_path, transform=transform)
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = SwinForImageClassification.from_pretrained(
+    "microsoft/swin-tiny-patch4-window7-224",
+    num_labels=2,
+    ignore_mismatched_sizes=True  
+)
+model = model.to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+train_losses, val_losses = [], []
+start_time = time.time()
+for epoch in range(3): 
+    model.train()
+    total_loss = 0
+    for batch in train_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(pixel_values=inputs).logits
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    train_losses.append(total_loss / len(train_loader))
+
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            inputs, labels = batch
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(pixel_values=inputs).logits
+            loss = loss_fn(outputs, labels)
+            val_loss += loss.item()
+    val_losses.append(val_loss / len(test_loader))
+    print(f"Epoch {epoch+1}, Train Loss: {train_losses[-1]}, Validation Loss: {val_losses[-1]}")
+end_time = time.time()
+training_time = end_time - start_time
+
+inference_start = time.time()
+y_true, y_pred = [], []
+with torch.no_grad():
+    for batch in test_loader:
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+        outputs = model(pixel_values=inputs).logits
+        predictions = torch.argmax(outputs, dim=-1)
+        y_true.extend(labels.cpu().numpy())
+        y_pred.extend(predictions.cpu().numpy())
+inference_end = time.time()
+inference_time = inference_end - inference_start
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=dataset.classes))
+
+conf_matrix = confusion_matrix(y_true, y_pred)
+TP = conf_matrix[1, 1]
+TN = conf_matrix[0, 0]
+FP = conf_matrix[0, 1]
+FN = conf_matrix[1, 0]
+sensitivity = TP / (TP + FN)
+specificity = TN / (TN + FP)
+print(f"Sensitivity: {sensitivity:.2f}")
+print(f"Specificity: {specificity:.2f}")
+
+fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+auc_score = roc_auc_score(y_true, y_pred)
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {auc_score:.2f})")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Eğrisi")
+plt.legend()
+plt.show()
+
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=dataset.classes, yticklabels=dataset.classes)
+plt.xlabel("Tahmin Edilen")
+plt.ylabel("Gerçek")
+plt.title("Karmaşıklık Matrisi")
+plt.show()
+
+plt.plot(train_losses, label="Eğitim Loss")
+plt.plot(val_losses, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Epoch vs Loss")
+plt.legend()
+plt.show()
+
+print(f"Eğitim Süresi: {training_time:.2f} saniye")
+print(f"Çıkarım Süresi: {inference_time:.2f} saniye")
+
