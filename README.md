@@ -74,21 +74,64 @@ Bu proje, fabrika kaynaklı ve motorlu taşıt kaynaklı hava kirliliği ile ilg
 | **Swin**         | 98%      | 0.98      | 0.98   | 0.98     | 0.98        | 0.98        | 0.98 |
 
 ### ROC Eğrileri, Karmaşıklık Matrisleri ve Epoch Loss Grafikleri
-SWİN Roc Grafiği: ![swinroc](https://github.com/user-attachments/assets/938e669f-0ece-4bcc-898a-130d14fec5ac)
-Swin Karmaşıklık Matrisi: ![swinkarmasiklik](https://github.com/user-attachments/assets/8050605d-234d-44f2-8212-5ac5957597ac)
-Swin Epoch Loss Grafiği: ![swinepochloss](https://github.com/user-attachments/assets/cee6de13-5b6f-4134-93b1-838b07809850)
-Efficiennet Roc Grafiği: ![efficiennetrocgrafik](https://github.com/user-attachments/assets/d37ef397-788b-4094-8a22-9e39115f64fb)
-Efficiennet Karmaşıklık Matrisi: ![efficiennetkarmasiklik](https://github.com/user-attachments/assets/af1929c1-b3f4-46c4-9040-893d61fdbe37)
-Efficiennet Epoch Loss Grafiği: ![efficiennetepocloss](https://github.com/user-attachments/assets/5384dad4-068a-4037-9f33-17c2fa3d4604)
-DeiT Roc Grafiği: ![deit rocgrafik](https://github.com/user-attachments/assets/43db1667-1d7b-47ab-b70c-d7f237fa532c)
-DeiT Karmaşıklık Matrisi: ![deit karmasşıklık](https://github.com/user-attachments/assets/99b5bcb1-d056-4235-9a28-044a303b0de7)
-DeiT Epoch Loss Grafiği: ![deit epoclos](https://github.com/user-attachments/assets/e5f375f7-b751-4e22-80d1-1199f0056e59)
-BEİT Roc Grafiği: ![beitrocgrafik](https://github.com/user-attachments/assets/8ae86ac8-ec05-48ab-8351-584a3f21d301)
-BEİT Karmaşıklık Matrisi: ![beitkarmasik](https://github.com/user-attachments/assets/886e8247-6b7f-4e08-b84d-03726ef8a3e1)
-BEİT Epoch Loss Grafiği: ![beitepoclos](https://github.com/user-attachments/assets/d3d48c7f-5c2a-4e79-afa4-8c56fb74bc3e)
-VİT Roc Grafiği: ![vitrocgrafik](https://github.com/user-attachments/assets/745ed7a8-891d-460b-9b7b-a887b149862b)
-BİT Karmaşıklık Matrisi: ![vit karmaşıklık](https://github.com/user-attachments/assets/02481827-373b-46ab-ae78-ded10916c19e)
-VİT Epoch Loss Grafiği: ![vit eğitimtablosu](https://github.com/user-attachments/assets/a7582838-e9f8-4f73-b917-54831da6eec9)
+SWİN Roc Grafiği: 
+![swinroc](https://github.com/user-attachments/assets/938e669f-0ece-4bcc-898a-130d14fec5ac)
+
+
+Swin Karmaşıklık Matrisi: 
+![swinkarmasiklik](https://github.com/user-attachments/assets/8050605d-234d-44f2-8212-5ac5957597ac)
+
+
+Swin Epoch Loss Grafiği: 
+![swinepochloss](https://github.com/user-attachments/assets/cee6de13-5b6f-4134-93b1-838b07809850)
+
+
+Efficiennet Roc Grafiği: 
+![efficiennetrocgrafik](https://github.com/user-attachments/assets/d37ef397-788b-4094-8a22-9e39115f64fb)
+
+
+Efficiennet Karmaşıklık Matrisi: 
+![efficiennetkarmasiklik](https://github.com/user-attachments/assets/af1929c1-b3f4-46c4-9040-893d61fdbe37)
+
+
+Efficiennet Epoch Loss Grafiği: 
+![efficiennetepocloss](https://github.com/user-attachments/assets/5384dad4-068a-4037-9f33-17c2fa3d4604)
+
+
+DeiT Roc Grafiği: 
+![deit rocgrafik](https://github.com/user-attachments/assets/43db1667-1d7b-47ab-b70c-d7f237fa532c)
+
+
+DeiT Karmaşıklık Matrisi: 
+![deit karmasşıklık](https://github.com/user-attachments/assets/99b5bcb1-d056-4235-9a28-044a303b0de7)
+
+
+DeiT Epoch Loss Grafiği: 
+![deit epoclos](https://github.com/user-attachments/assets/e5f375f7-b751-4e22-80d1-1199f0056e59)
+
+
+BEİT Roc Grafiği: 
+![beitrocgrafik](https://github.com/user-attachments/assets/8ae86ac8-ec05-48ab-8351-584a3f21d301)
+
+
+BEİT Karmaşıklık Matrisi: 
+![beitkarmasik](https://github.com/user-attachments/assets/886e8247-6b7f-4e08-b84d-03726ef8a3e1)
+
+
+BEİT Epoch Loss Grafiği: 
+![beitepoclos](https://github.com/user-attachments/assets/d3d48c7f-5c2a-4e79-afa4-8c56fb74bc3e)
+
+
+VİT Roc Grafiği: 
+![vitrocgrafik](https://github.com/user-attachments/assets/745ed7a8-891d-460b-9b7b-a887b149862b)
+
+
+BİT Karmaşıklık Matrisi: 
+![vit karmaşıklık](https://github.com/user-attachments/assets/02481827-373b-46ab-ae78-ded10916c19e)
+
+
+VİT Epoch Loss Grafiği: 
+![vit eğitimtablosu](https://github.com/user-attachments/assets/a7582838-e9f8-4f73-b917-54831da6eec9)
 
 
 
